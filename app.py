@@ -8,11 +8,11 @@ import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 from sklearn.linear_model import LinearRegression
+from sklearn.preprocessing import PolynomialFeatures
 from sklearn.metrics import r2_score
 
 app = Flask(__name__)
 
-# Create a folder to temporarily store the uploaded CSV
 UPLOAD_FOLDER = 'uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
@@ -21,92 +21,70 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 def index():
     if request.method == 'POST':
         
-        # ==========================================
-        # STEP 1: Handle File Upload & Read Headers + Top 10 Rows
-        # ==========================================
+        # STEP 1: Handle File Upload
         if 'file' in request.files:
             file = request.files['file']
             if file.filename == '':
                 return render_template('index.html', error_msg='No selected file.', step=1)
             
             try:
-                # Save the file locally so we can access it in Step 2
                 filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'data.csv')
                 file.save(filepath)
                 
-                # Open the file to read the headers AND the first 10 rows
                 with open(filepath, 'r', encoding='utf-8') as f:
                     csv_reader = csv.reader(f)
                     headers = next(csv_reader, None)
+                    data_preview = [row for i, row in enumerate(csv_reader) if i < 10]  # Preview first 10 rows
                     
-                    if not headers:
-                        raise ValueError("The uploaded CSV file is empty.")
-                    
-                    # Read the first 10 rows for the preview table
-                    data_preview = []
-                    for i, row in enumerate(csv_reader):
-                        if i < 10:
-                            data_preview.append(row)
-                        else:
-                            break
-                    
-                # Render the page again, showing dropdowns AND the 10-row preview (Step 2)
                 return render_template('index.html', headers=headers, data_preview=data_preview, step=2)
-                
             except Exception as e:
-                return render_template('index.html', error_msg=f"Error reading file: {e}", step=1)
+                return render_template('index.html', error_msg=f"Upload error: {e}", step=1)
 
-        # ==========================================
-        # STEP 2: Process Selected Variables & Plot
-        # ==========================================
+        # STEP 2: Process Polynomial Regression
         elif 'x_var' in request.form and 'y_var' in request.form:
             x_var = request.form['x_var']
             y_var = request.form['y_var']
+            degree = int(request.form.get('degree', 2))
             filepath = os.path.join(app.config['UPLOAD_FOLDER'], 'data.csv')
             
             try:
+                x_data, y_data = [], []
                 with open(filepath, 'r', encoding='utf-8') as f:
                     csv_reader = csv.reader(f)
-                    headers = next(csv_reader)
-                    
-                    # Find which column index matches the user's choice
-                    x_idx = headers.index(x_var)
-                    y_idx = headers.index(y_var)
-                    
-                    x_data = []
-                    y_data = []
+                    headers = list(next(csv_reader))
+                    x_idx, y_idx = headers.index(x_var), headers.index(y_var)
                     
                     for row in csv_reader:
-                        # Ensure the row has enough columns
-                        if len(row) > max(x_idx, y_idx):
-                            try:
-                                x_data.append(float(row[x_idx].strip()))
-                                y_data.append(float(row[y_idx].strip()))
-                            except ValueError:
-                                pass # Skip text/empty rows
+                        try:
+                            x_data.append(float(row[x_idx].strip()))
+                            y_data.append(float(row[y_idx].strip()))
+                        except (ValueError, IndexError): continue
                 
-                # Convert to numpy arrays
                 X = np.array(x_data).reshape(-1, 1)
                 y = np.array(y_data)
-                
-                if len(X) == 0:
-                    raise ValueError(f"Could not find valid numbers in '{x_var}' or '{y_var}'. Try picking different columns.")
 
-                # Machine Learning Model
-                model = LinearRegression()
-                model.fit(X, y)
-                y_pred = model.predict(X)
-                accuracy = round(r2_score(y, y_pred) * 100, 2)
+                # --- Polynomial Transformation ---
+                poly = PolynomialFeatures(degree=degree)
+                X_poly = poly.fit_transform(X)
                 
-                # Generate Plot
+                model = LinearRegression()
+                model.fit(X_poly, y)
+                y_pred = model.predict(X_poly)
+                accuracy = round(r2_score(y, y_pred) * 100, 2)
+
+                # --- Generate Smooth Curve for Plotting ---
+                # We create 100 points between min and max X for a smooth line
+                X_range = np.linspace(X.min(), X.max(), 100).reshape(-1, 1)
+                y_range_pred = model.predict(poly.transform(X_range))
+
                 plt.figure(figsize=(8, 5))
-                plt.scatter(X, y, color='blue', label='Actual Data', alpha=0.6)
-                plt.plot(X, y_pred, color='red', linewidth=2, label='Regression Line')
+                plt.scatter(X, y, color='royalblue', alpha=0.6, label='Actual Data')
+                plt.plot(X_range, y_range_pred, color='crimson', linewidth=3, label=f'Polynomial Fit (Deg {degree})')
                 plt.xlabel(x_var)
                 plt.ylabel(y_var)
-                plt.title(f'{y_var} based on {x_var}')
+                plt.title(f'Polynomial Regression: {y_var} based on {x_var}')
                 plt.legend()
-                plt.grid(True)
+                plt.grid(True, linestyle='--', alpha=0.7)
                 
                 img = io.BytesIO()
                 plt.savefig(img, format='png')
@@ -114,15 +92,11 @@ def index():
                 plot_url = base64.b64encode(img.getvalue()).decode('utf8')
                 plt.close()
                 
-                # Show the final results (Step 3)
-                return render_template('index.html', plot_url=plot_url, accuracy=accuracy, step=3)
-                
+                return render_template('index.html', plot_url=plot_url, accuracy=accuracy, degree=degree, step=3)
             except Exception as e:
                 return render_template('index.html', error_msg=f"Analysis error: {e}", step=1)
 
-    # Default to Step 1 on first load
     return render_template('index.html', step=1)
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
-    
+    app.run(debug=True, port=5000)

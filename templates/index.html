@@ -3,107 +3,95 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>SLR Web App</title>
+    <title>Polynomial Regression App</title>
     <style>
-        body { font-family: Arial, sans-serif; margin: 40px; text-align: center; background-color: #f4f4f9;}
-        .container { background-color: white; max-width: 900px; margin: auto; padding: 30px; border-radius: 10px; box-shadow: 0px 4px 10px rgba(0,0,0,0.1); }
-        .form-group { margin: 20px 0; }
-        select { padding: 10px; font-size: 16px; margin: 0 10px; width: 200px;}
-        button { padding: 10px 20px; background-color: #007bff; color: white; border: none; border-radius: 5px; cursor: pointer; font-size: 16px;}
-        button:hover { background-color: #0056b3; }
-        .btn-secondary { background-color: #6c757d; margin-top: 20px;}
-        .btn-secondary:hover { background-color: #5a6268; }
-        .error { color: red; font-weight: bold; }
-        .results { margin-top: 30px; }
-        img { max-width: 100%; height: auto; border: 1px solid #ccc; margin-top: 20px; border-radius: 5px;}
-        
-        /* New Table Styles */
-        .table-container { overflow-x: auto; margin: 20px 0; border: 1px solid #ddd; border-radius: 5px; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin: 40px; text-align: center; background-color: #f4f7f6; color: #333; }
+        .container { background-color: white; max-width: 900px; margin: auto; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 20px rgba(0,0,0,0.1); }
+        .form-group { margin: 25px 0; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto; }
+        label { font-weight: bold; display: block; margin-bottom: 8px; }
+        select, input[type="number"] { padding: 12px; font-size: 16px; width: 100%; border-radius: 6px; border: 1px solid #ccd; box-sizing: border-box; }
+        button { padding: 12px 24px; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: 0.3s; }
+        button:hover { background-color: #218838; }
+        .btn-secondary { background-color: #6c757d; margin-top: 20px; width: auto; }
+        .error { color: #d9534f; background: #fdf7f7; padding: 10px; border-radius: 5px; border: 1px solid #d9534f; }
+        .table-container { overflow-x: auto; margin: 20px 0; border: 1px solid #eee; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
-        th, td { border-bottom: 1px solid #ddd; padding: 10px; }
-        th { background-color: #007bff; color: white; }
-        tr:nth-child(even) { background-color: #f2f2f2; }
+        th, td { border-bottom: 1px solid #eee; padding: 12px; }
+        th { background-color: #f8f9fa; color: #555; }
+        tr:hover { background-color: #f1f1f1; }
+        .hint { font-size: 13px; color: #777; margin-top: 6px; display: block; }
     </style>
 </head>
 <body>
 
 <div class="container">
-    <h1>Custom Linear Regression Analyzer</h1>
+    <h1>Polynomial Regression Analyzer</h1>
     
     {% if error_msg %}
         <p class="error">{{ error_msg }}</p>
     {% endif %}
 
     {% if step == 1 %}
-        <p>Upload a CSV file to get started.</p>
+        <p>Start by uploading your dataset in CSV format.</p>
         <form method="POST" enctype="multipart/form-data">
             <div class="form-group">
                 <input type="file" name="file" accept=".csv" required>
             </div>
-            <button type="submit">Upload CSV</button>
+            <button type="submit">Upload & Preview</button>
         </form>
     {% endif %}
 
     {% if step == 2 %}
-        <h3 style="color: #28a745;">File uploaded successfully!</h3>
-        <p>Here is a preview of the first 10 rows of your dataset:</p>
-        
+        <h3 style="color: #28a745;">Data Preview (Top 10 Rows)</h3>
         <div class="table-container">
             <table>
                 <thead>
-                    <tr>
-                        {% for header in headers %}
-                            <th>{{ header }}</th>
-                        {% endfor %}
-                    </tr>
+                    <tr>{% for h in headers %}<th>{{ h }}</th>{% endfor %}</tr>
                 </thead>
                 <tbody>
                     {% for row in data_preview %}
-                        <tr>
-                            {% for cell in row %}
-                                <td>{{ cell }}</td>
-                            {% endfor %}
-                        </tr>
+                        <tr>{% for cell in row %}<td>{{ cell }}</td>{% endfor %}</tr>
                     {% endfor %}
                 </tbody>
             </table>
         </div>
 
-        <p>Now, select the columns you want to analyze.</p>
         <form method="POST">
             <div class="form-group">
-                <label for="x_var"><strong>Independent Variable (X):</strong></label>
+                <label for="x_var">Independent Variable (X):</label>
                 <select name="x_var" id="x_var" required>
-                    {% for header in headers %}
-                        <option value="{{ header }}">{{ header }}</option>
-                    {% endfor %}
+                    {% for h in headers %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
                 </select>
             </div>
             
             <div class="form-group">
-                <label for="y_var"><strong>Dependent Variable (Y):</strong></label>
+                <label for="y_var">Dependent Variable (Y):</label>
                 <select name="y_var" id="y_var" required>
-                    {% for header in headers %}
-                        <option value="{{ header }}">{{ header }}</option>
-                    {% endfor %}
+                    {% for h in headers %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
                 </select>
             </div>
+
+            <div class="form-group">
+                <label for="degree">Polynomial Degree (Complexity):</label>
+                <input type="number" name="degree" id="degree" value="2" min="1" max="15" required>
+                <span class="hint">1 = Linear, 2 = Quadratic (1 curve), 3 = Cubic (2 curves).</span>
+            </div>
             
-            <button type="submit">Generate Regression Model</button>
+            <button type="submit">Run Polynomial Regression</button>
         </form>
     {% endif %}
 
     {% if step == 3 %}
         <div class="results">
-            <h2>Analysis Results</h2>
-            <p><strong>Model Accuracy (R² Score):</strong> {{ accuracy }}%</p>
+            <h2>Analysis Complete</h2>
+            <p><strong>R² Accuracy:</strong> {{ accuracy }}% (Degree {{ degree }})</p>
             
             {% if plot_url %}
-                <img src="data:image/png;base64,{{ plot_url }}" alt="Scatter Plot with Regression Line">
+                <img src="data:image/png;base64,{{ plot_url }}" alt="Polynomial Regression Plot">
             {% endif %}
             
             <br>
-            <a href="/"><button class="btn-secondary">Start Over with New File</button></a>
+            <a href="/"><button class="btn-secondary">Analyze New Dataset</button></a>
         </div>
     {% endif %}
 </div>
