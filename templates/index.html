@@ -9,10 +9,12 @@
         .container { background-color: white; max-width: 900px; margin: auto; padding: 30px; border-radius: 12px; box-shadow: 0px 8px 20px rgba(0,0,0,0.1); }
         .form-group { margin: 25px 0; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto; }
         label { font-weight: bold; display: block; margin-bottom: 8px; }
-        select, input[type="number"] { padding: 12px; font-size: 16px; width: 100%; border-radius: 6px; border: 1px solid #ccd; box-sizing: border-box; }
+        select, input[type="number"], input[type="text"] { padding: 12px; font-size: 16px; width: 100%; border-radius: 6px; border: 1px solid #ccd; box-sizing: border-box; }
         button { padding: 12px 24px; background-color: #28a745; color: white; border: none; border-radius: 6px; cursor: pointer; font-size: 16px; font-weight: bold; width: 100%; transition: 0.3s; }
         button:hover { background-color: #218838; }
         .btn-secondary { background-color: #6c757d; margin-top: 20px; width: auto; }
+        .btn-predict { background-color: #007bff; margin-top: 10px; }
+        .btn-predict:hover { background-color: #0056b3; }
         .error { color: #d9534f; background: #fdf7f7; padding: 10px; border-radius: 5px; border: 1px solid #d9534f; }
         .table-container { overflow-x: auto; margin: 20px 0; border: 1px solid #eee; border-radius: 8px; }
         table { width: 100%; border-collapse: collapse; font-size: 14px; text-align: left; }
@@ -20,13 +22,17 @@
         th { background-color: #f8f9fa; color: #555; }
         tr:hover { background-color: #f1f1f1; }
         .hint { font-size: 13px; color: #777; margin-top: 6px; display: block; }
+        .predict-box { background: #f0f8ff; border: 2px solid #007bff; border-radius: 10px; padding: 20px; margin-top: 30px; text-align: left; max-width: 500px; margin-left: auto; margin-right: auto; }
+        .predict-box h3 { text-align: center; color: #007bff; margin-top: 0; }
+        .result-badge { background: #007bff; color: white; padding: 14px 20px; border-radius: 8px; font-size: 20px; font-weight: bold; margin-top: 15px; display: block; text-align: center; }
+        .divider { border: none; border-top: 2px dashed #ddd; margin: 30px 0; }
     </style>
 </head>
 <body>
 
 <div class="container">
     <h1>Polynomial Regression Analyzer</h1>
-    
+
     {% if error_msg %}
         <p class="error">{{ error_msg }}</p>
     {% endif %}
@@ -37,7 +43,7 @@
             <div class="form-group">
                 <input type="file" name="file" accept=".csv" required>
             </div>
-            <button type="submit">Upload & Preview</button>
+            <button type="submit">Upload &amp; Preview</button>
         </form>
     {% endif %}
 
@@ -63,7 +69,7 @@
                     {% for h in headers %}<option value="{{ h }}">{{ h }}</option>{% endfor %}
                 </select>
             </div>
-            
+
             <div class="form-group">
                 <label for="y_var">Dependent Variable (Y):</label>
                 <select name="y_var" id="y_var" required>
@@ -76,7 +82,7 @@
                 <input type="number" name="degree" id="degree" value="2" min="1" max="15" required>
                 <span class="hint">1 = Linear, 2 = Quadratic (1 curve), 3 = Cubic (2 curves).</span>
             </div>
-            
+
             <button type="submit">Run Polynomial Regression</button>
         </form>
     {% endif %}
@@ -85,11 +91,44 @@
         <div class="results">
             <h2>Analysis Complete</h2>
             <p><strong>R² Accuracy:</strong> {{ accuracy }}% (Degree {{ degree }})</p>
-            
+
             {% if plot_url %}
-                <img src="data:image/png;base64,{{ plot_url }}" alt="Polynomial Regression Plot">
+                <img src="data:image/png;base64,{{ plot_url }}" alt="Polynomial Regression Plot" style="max-width:100%;">
             {% endif %}
-            
+
+            <hr class="divider">
+
+            <!-- Predict by entering a value -->
+            <div class="predict-box">
+                <h3>🔮 Predict a Value</h3>
+                <p style="text-align:center; color:#555;">Enter a value for <strong>{{ x_var }}</strong> to get the predicted <strong>{{ y_var }}</strong>.</p>
+
+                <form method="POST">
+                    <!-- carry forward context -->
+                    <input type="hidden" name="x_var" value="{{ x_var }}">
+                    <input type="hidden" name="y_var" value="{{ y_var }}">
+                    <input type="hidden" name="degree" value="{{ degree }}">
+                    <input type="hidden" name="accuracy" value="{{ accuracy }}">
+                    <input type="hidden" name="plot_url" value="{{ plot_url }}">
+
+                    <div class="form-group" style="margin: 10px 0;">
+                        <label for="predict_x">Enter value for {{ x_var }}:</label>
+                        <input type="number" step="any" name="predict_x" id="predict_x"
+                               placeholder="e.g. 42.5"
+                               value="{{ predict_x if predict_x is defined else '' }}"
+                               required>
+                    </div>
+
+                    <button type="submit" class="btn-predict">Predict {{ y_var }}</button>
+                </form>
+
+                {% if predicted_y is defined and predicted_y != None %}
+                    <span class="result-badge">
+                        Predicted {{ y_var }} = {{ predicted_y }}
+                    </span>
+                {% endif %}
+            </div>
+
             <br>
             <a href="/"><button class="btn-secondary">Analyze New Dataset</button></a>
         </div>
